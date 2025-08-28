@@ -23,6 +23,16 @@ class QRCodeGeneratorApp:
         self.root.geometry("800x700")
         self.root.resizable(True, True)
         
+        # Ajouter l'icône à la fenêtre principale
+        try:
+            # Chemin relatif depuis le dossier src vers assets
+            icon_path = os.path.join("..", "assets", "logo_sudalys_services.ico")
+            if os.path.exists(icon_path):
+                self.root.iconbitmap(icon_path)
+        except Exception:
+            # Si l'icône n'est pas trouvée, continuer sans erreur
+            pass
+        
         # Configurer le style
         self.style = ttk.Style()
         self.style.configure("TFrame", background="#f0f0f0")
@@ -689,7 +699,8 @@ Pour de meilleurs résultats, utilisez le format standard."""
         
         # Ajouter l'icône à la fenêtre d'aide
         try:
-            icon_path = "assets/logo_sudalys_services.ico"
+            # Chemin relatif depuis le dossier src vers assets
+            icon_path = os.path.join("..", "assets", "logo_sudalys_services.ico")
             if os.path.exists(icon_path):
                 self.help_window.iconbitmap(icon_path)
         except Exception:
