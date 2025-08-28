@@ -12,8 +12,8 @@ from PIL import Image, ImageTk
 import io
 import openpyxl
 
-# Importer les fonctions du générateur sans pandas
-from qr_generator_no_pandas import create_vcard, parse_address, generate_qr_svg, process_excel_file
+# Importer les fonctions du générateur
+from qr_generator import create_vcard, parse_address, generate_qr_svg, process_excel_file
 
 class QRCodeGeneratorApp:
     def __init__(self, root):
