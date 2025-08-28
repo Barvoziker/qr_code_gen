@@ -132,9 +132,16 @@ dmypy.json
 build/
 dist/
 *.spec
+build_installer/
 
-# Generated icons
-*.ico
+# Generated QR codes (keep folder structure but ignore content)
+qr_codes/*.svg
+qr_codes/*.png
+qr_codes/*.jpg
+qr_codes/*.jpeg
+
+# Keep assets but ignore generated icons (keep the original ones)
+# assets/*.ico (commented - we want to keep the original logo icon)
 
 # IDE files
 .idea/
@@ -152,12 +159,17 @@ dist/
 ehthumbs.db
 Thumbs.db
 
-# Project specific
-qr_codes/*.svg
-qr_codes/*.png
-qr_codes/*.jpg
-qr_codes/*.jpeg
+# Installer output (keep the directory but ignore the generated installer)
+installer_output/*.exe
+installer_output/*.msi
 
 # Temporary files
 *.tmp
 *.temp
+
+# Log files
+*.log
+
+# Test files
+test_*.py
+*_test.py

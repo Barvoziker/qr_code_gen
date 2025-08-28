@@ -20,7 +20,7 @@ def build_executable():
     print("Compilation de l'application en exécutable...")
     
     # Nom du fichier principal
-    main_file = "qr_app.py"
+    main_file = "src/qr_app.py"
     
     # Vérifier que le fichier principal existe
     if not os.path.exists(main_file):
@@ -32,21 +32,22 @@ def build_executable():
     
     # Chemin de l'icône (si disponible)
     icon_path = ""
-    if os.path.exists("logo_sudalys_services.ico"):
-        icon_path = "--icon=logo_sudalys_services.ico"
+    if os.path.exists("assets/logo_sudalys_services.ico"):
+        icon_path = "--icon=assets/logo_sudalys_services.ico"
     else:
         # Essayer de créer l'icône à partir du logo JPG
         try:
+            sys.path.append('build_scripts')
             from create_icon import create_icon
             if create_icon():
-                icon_path = "--icon=logo_sudalys_services.ico"
+                icon_path = "--icon=assets/logo_sudalys_services.ico"
         except Exception as e:
             print(f"AVERTISSEMENT: Impossible de créer l'icône: {e}")
     
     # Fichiers à inclure
     data_files = [
-        "--add-data", f"logo_sudalys_services.jpg{os.pathsep}.",
-        "--add-data", f"contacts.xlsx{os.pathsep}."
+        "--add-data", f"assets/logo_sudalys_services.jpg{os.pathsep}.",
+        "--add-data", f"data/contacts.xlsx{os.pathsep}."
     ]
     
     # Options PyInstaller
@@ -73,7 +74,7 @@ def build_executable():
         "--hidden-import", "openpyxl",
         "--hidden-import", "qrcode",
         "--hidden-import", "PIL",
-        "--add-binary", f"logo_sudalys_services.ico{os.pathsep}."  # Inclure l'icône comme ressource binaire
+        "--add-binary", f"assets/logo_sudalys_services.ico{os.pathsep}."  # Inclure l'icône comme ressource binaire
     ]
     
     # Construire la commande PyInstaller
