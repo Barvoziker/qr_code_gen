@@ -12,7 +12,7 @@ class SudalysInstaller:
     def __init__(self):
         self.app_name = "Sudalys QR Generator"
         self.app_version = "1.0"
-        self.publisher = "Sudalys Services"
+        self.publisher = "Mathis Buchet"
         
         # Chemins d'installation (dossier utilisateur pour éviter les droits admin)
         self.install_dir = Path.home() / "AppData" / "Local" / "Sudalys QR Generator"
