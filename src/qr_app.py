@@ -94,6 +94,9 @@ class QRCodeGeneratorApp:
         self.last_update_time = 0
         self.update_delay = 500  # 500ms de délai pour éviter trop de générations
         
+        # Variable pour la fenêtre d'aide
+        self.help_window = None
+        
         # Vider complètement la mémoire au démarrage
         self.clear_all_data()
     
@@ -657,6 +660,13 @@ class QRCodeGeneratorApp:
             messagebox.showerror("Erreur", f"Erreur lors de la création du template : {e}")
             
     def show_address_help(self):
+        # Vérifier si la fenêtre d'aide existe déjà et est visible
+        if self.help_window and self.help_window.winfo_exists():
+            # Ramener la fenêtre au premier plan
+            self.help_window.lift()
+            self.help_window.focus_force()
+            return
+        
         help_text = """Formats d'adresse pris en charge:
 
 1. Format standard: 123 rue de Paris 75001 PARIS
@@ -673,16 +683,31 @@ Le système essaiera d'extraire automatiquement:
 
 Pour de meilleurs résultats, utilisez le format standard."""
         
-        help_window = tk.Toplevel(self.root)
-        help_window.title("Aide - Format d'adresse")
-        help_window.geometry("500x350")
+        self.help_window = tk.Toplevel(self.root)
+        self.help_window.title("Aide - Format d'adresse")
+        self.help_window.geometry("500x350")
         
-        text_widget = tk.Text(help_window, wrap=tk.WORD, padx=10, pady=10)
+        # Ajouter l'icône à la fenêtre d'aide
+        try:
+            icon_path = "assets/logo_sudalys_services.ico"
+            if os.path.exists(icon_path):
+                self.help_window.iconbitmap(icon_path)
+        except Exception:
+            # Si l'icône n'est pas trouvée, continuer sans erreur
+            pass
+        
+        # Fonction pour nettoyer la référence quand la fenêtre se ferme
+        def on_help_window_close():
+            self.help_window = None
+        
+        self.help_window.protocol("WM_DELETE_WINDOW", lambda: [self.help_window.destroy(), on_help_window_close()])
+        
+        text_widget = tk.Text(self.help_window, wrap=tk.WORD, padx=10, pady=10)
         text_widget.insert(tk.END, help_text)
         text_widget.config(state=tk.DISABLED)
         text_widget.pack(fill=tk.BOTH, expand=True)
         
-        close_btn = ttk.Button(help_window, text="Fermer", command=help_window.destroy)
+        close_btn = ttk.Button(self.help_window, text="Fermer", command=lambda: [self.help_window.destroy(), on_help_window_close()])
         close_btn.pack(pady=10)
 
 def main():
