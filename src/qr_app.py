@@ -11,6 +11,7 @@ from pathlib import Path
 from PIL import Image, ImageTk
 import io
 import openpyxl
+import openpyxl.styles
 
 # Importer les fonctions du générateur
 from qr_generator import create_vcard, parse_address, generate_qr_svg, process_excel_file
@@ -88,6 +89,13 @@ class QRCodeGeneratorApp:
         # Données Excel
         self.excel_data = []
         self.excel_headers = {}
+        
+        # Variable pour optimiser la génération en temps réel
+        self.last_update_time = 0
+        self.update_delay = 500  # 500ms de délai pour éviter trop de générations
+        
+        # Vider complètement la mémoire au démarrage
+        self.clear_all_data()
     
     def setup_manual_tab(self):
         # Créer un cadre pour les champs de saisie
@@ -116,6 +124,10 @@ class QRCodeGeneratorApp:
             entry = ttk.Entry(form_frame, width=40)
             entry.grid(row=i, column=1, sticky="ew", padx=5, pady=5)
             
+            # Ajouter l'événement de saisie en temps réel
+            entry.bind('<KeyRelease>', self.on_manual_field_change)
+            entry.bind('<FocusOut>', self.on_manual_field_change)
+            
             self.manual_entries[field_name] = entry
             
             # Ajouter un texte d'aide pour le champ adresse
@@ -138,6 +150,9 @@ class QRCodeGeneratorApp:
         
         clear_btn = ttk.Button(button_frame, text="Effacer", command=self.clear_manual_form)
         clear_btn.pack(side=tk.LEFT, padx=5)
+        
+        clear_all_btn = ttk.Button(button_frame, text="Tout Vider", command=self.clear_all_data)
+        clear_all_btn.pack(side=tk.LEFT, padx=5)
         
         save_btn = ttk.Button(button_frame, text="Enregistrer QR Code", command=self.save_current_qr)
         save_btn.pack(side=tk.LEFT, padx=5)
@@ -166,9 +181,18 @@ class QRCodeGeneratorApp:
         browse_btn = ttk.Button(file_frame, text="Parcourir", command=self.browse_excel)
         browse_btn.pack(side=tk.LEFT, padx=5)
         
-        # Bouton pour générer tous les QR codes
-        generate_all_btn = ttk.Button(excel_frame, text="Générer tous les QR Codes", command=self.generate_all_qr)
-        generate_all_btn.pack(pady=10)
+        # Boutons Excel
+        excel_buttons_frame = ttk.Frame(excel_frame)
+        excel_buttons_frame.pack(pady=10)
+        
+        generate_all_btn = ttk.Button(excel_buttons_frame, text="Générer tous les QR Codes", command=self.generate_all_qr)
+        generate_all_btn.pack(side=tk.LEFT, padx=5)
+        
+        clear_excel_btn = ttk.Button(excel_buttons_frame, text="Vider Excel", command=self.clear_excel_data)
+        clear_excel_btn.pack(side=tk.LEFT, padx=5)
+        
+        template_btn = ttk.Button(excel_buttons_frame, text="Télécharger Template", command=self.download_excel_template)
+        template_btn.pack(side=tk.LEFT, padx=5)
         
         # Tableau pour afficher les données Excel
         self.excel_tree = ttk.Treeview(excel_frame, columns=("prenom", "nom", "profession", "societe", "email"), show="headings")
@@ -222,14 +246,22 @@ class QRCodeGeneratorApp:
                 if cell.value:
                     self.excel_headers[cell.value.lower()] = col_idx
             
-            # Lire toutes les données
+            # Lire toutes les données (seulement les lignes non vides)
             self.excel_data = []
             for row in sheet.iter_rows(min_row=2):
                 row_data = {}
+                has_data = False
+                
                 for header, col_idx in self.excel_headers.items():
                     cell = row[col_idx]
-                    row_data[header] = str(cell.value).strip() if cell.value is not None else ''
-                self.excel_data.append(row_data)
+                    value = str(cell.value).strip() if cell.value is not None else ''
+                    row_data[header] = value
+                    if value:  # Si au moins une cellule a des données
+                        has_data = True
+                
+                # N'ajouter que les lignes qui ont au moins une donnée
+                if has_data:
+                    self.excel_data.append(row_data)
             
             # Effacer les données existantes dans le tableau
             for item in self.excel_tree.get_children():
@@ -252,11 +284,29 @@ class QRCodeGeneratorApp:
     def on_excel_row_select(self, event):
         selected_items = self.excel_tree.selection()
         if selected_items:
-            index = int(selected_items[0])
-            row_data = self.excel_data[index]
-            
-            # Générer le QR code pour cette ligne
-            self.generate_qr_from_row(row_data, index)
+            try:
+                index = int(selected_items[0])
+                # Vérifier que l'index est valide
+                if 0 <= index < len(self.excel_data):
+                    row_data = self.excel_data[index]
+                    
+                    # Vérifier que la ligne a des données valides
+                    prenom = row_data.get('prenom', '').strip()
+                    nom = row_data.get('nom', '').strip()
+                    
+                    if prenom or nom:  # Au moins un des deux champs requis
+                        # Générer le QR code pour cette ligne
+                        self.generate_qr_from_row(row_data, index)
+                    else:
+                        # Désélectionner silencieusement la ligne vide
+                        self.excel_tree.selection_remove(selected_items[0])
+                else:
+                    # Index invalide, désélectionner silencieusement
+                    self.excel_tree.selection_remove(selected_items[0])
+            except (ValueError, IndexError):
+                # Erreur de conversion ou d'index, désélectionner silencieusement
+                if selected_items:
+                    self.excel_tree.selection_remove(selected_items[0])
     
     def generate_qr_from_row(self, row_data, index):
         try:
@@ -425,8 +475,186 @@ class QRCodeGeneratorApp:
             messagebox.showerror("Erreur", f"Erreur lors de la génération des QR codes: {e}")
     
     def clear_manual_form(self):
+        """Vide uniquement les champs de saisie manuelle"""
         for entry in self.manual_entries.values():
             entry.delete(0, tk.END)
+    
+    def clear_excel_data(self):
+        """Vide les données Excel et remet le chemin par défaut"""
+        # Vider le tableau Excel
+        for item in self.excel_tree.get_children():
+            self.excel_tree.delete(item)
+        
+        # Vider les données en mémoire
+        self.excel_data = []
+        self.excel_headers = {}
+        
+        # Remettre le chemin par défaut
+        self.excel_path_var.set("contacts.xlsx")
+        
+    
+    def clear_all_data(self):
+        """Vide complètement toutes les données de l'application"""
+        # Vider les champs de saisie manuelle
+        if hasattr(self, 'manual_entries'):
+            for entry in self.manual_entries.values():
+                entry.delete(0, tk.END)
+        
+        # Vider les données Excel
+        if hasattr(self, 'excel_tree'):
+            for item in self.excel_tree.get_children():
+                self.excel_tree.delete(item)
+        
+        # Réinitialiser toutes les variables de données
+        self.excel_data = []
+        self.excel_headers = {}
+        self.current_qr_data = None
+        self.current_qr_filename = None
+        
+        # Remettre le chemin Excel par défaut
+        if hasattr(self, 'excel_path_var'):
+            self.excel_path_var.set("contacts.xlsx")
+        
+        # Vider l'aperçu du QR code
+        if hasattr(self, 'preview_label'):
+            self.preview_label.configure(image="")
+            if hasattr(self, 'preview_photo'):
+                del self.preview_photo
+        
+        # Pas de message de confirmation pour éviter les popups
+    
+    def on_manual_field_change(self, event=None):
+        """Génère automatiquement le QR code quand les champs changent"""
+        import time
+        current_time = time.time() * 1000  # Convertir en millisecondes
+        
+        # Optimisation : éviter trop de générations rapprochées
+        if current_time - self.last_update_time < self.update_delay:
+            # Programmer une génération différée
+            self.root.after(self.update_delay, self.delayed_qr_generation)
+            return
+        
+        self.last_update_time = current_time
+        self.generate_realtime_qr()
+    
+    def delayed_qr_generation(self):
+        """Génération différée pour optimiser les performances"""
+        import time
+        current_time = time.time() * 1000
+        
+        # Vérifier si une nouvelle saisie n'a pas eu lieu entre temps
+        if current_time - self.last_update_time >= self.update_delay:
+            self.generate_realtime_qr()
+    
+    def generate_realtime_qr(self):
+        """Génère le QR code en temps réel pendant la saisie"""
+        try:
+            # Récupérer les données des champs
+            prenom = self.manual_entries["prenom"].get().strip()
+            nom = self.manual_entries["nom"].get().strip()
+            
+            # Générer seulement s'il y a au moins un prénom ou nom
+            if prenom or nom:
+                profession = self.manual_entries["profession"].get().strip()
+                societe = self.manual_entries["societe"].get().strip()
+                mobile = self.manual_entries["mobile"].get().strip()
+                pro = self.manual_entries["pro"].get().strip()
+                email = self.manual_entries["email"].get().strip()
+                adresse = self.manual_entries["adresse"].get().strip()
+                site_web = self.manual_entries["site_web"].get().strip()
+                
+                # Créer la vCard
+                vcard_data = create_vcard(prenom, nom, profession, societe, mobile, pro, email, adresse, site_web)
+                
+                # Générer le nom de fichier
+                filename = f"{prenom}_{nom}_realtime"
+                filename = "".join(c for c in filename if c.isalnum() or c in (' ', '-', '_')).rstrip()
+                
+                # Stocker les données actuelles
+                self.current_qr_data = vcard_data
+                self.current_qr_filename = filename
+                
+                # Afficher l'aperçu
+                self.update_qr_preview(vcard_data)
+            else:
+                # Vider l'aperçu si pas de données
+                if hasattr(self, 'preview_label'):
+                    self.preview_label.configure(image="")
+                    if hasattr(self, 'preview_photo'):
+                        del self.preview_photo
+                
+        except Exception as e:
+            # En cas d'erreur, ne pas afficher de message pour ne pas gêner la saisie
+            pass
+    
+    def download_excel_template(self):
+        """Crée et télécharge un template Excel avec les colonnes attendues"""
+        try:
+            # Créer un nouveau classeur Excel
+            workbook = openpyxl.Workbook()
+            sheet = workbook.active
+            sheet.title = "Contacts"
+            
+            # Définir les en-têtes de colonnes
+            headers = [
+                "Prenom", "Nom", "Profession", "Societe", "Mobile", 
+                "Pro", "Email", "Adresse", "Site_Web"
+            ]
+            
+            # Ajouter les en-têtes
+            for col_idx, header in enumerate(headers, 1):
+                cell = sheet.cell(row=1, column=col_idx)
+                cell.value = header
+                cell.font = openpyxl.styles.Font(bold=True)
+                cell.fill = openpyxl.styles.PatternFill(start_color="E6E6FA", end_color="E6E6FA", fill_type="solid")
+            
+            # Ajouter quelques exemples de données
+            examples = [
+                ["Jean", "DUPONT", "Développeur", "SUDALYS", "06.00.00.00.00", "01.00.00.00.00", "jean.dupont@sudalys.fr", "123 rue de Paris 75001 PARIS", "www.sudalys.fr"],
+                ["Marie", "MARTIN", "Chef de projet", "SUDALYS", "06.00.00.00.00", "01.00.00.00.00", "marie.martin@sudalys.fr", "456 avenue des Champs 75008 PARIS", ""],
+                ["Pierre", "BERNARD", "Commercial", "SUDALYS", "06.00.00.00.00", "", "pierre.bernard@sudalys.fr", "", ""]
+            ]
+            
+            for row_idx, example in enumerate(examples, 2):
+                for col_idx, value in enumerate(example, 1):
+                    sheet.cell(row=row_idx, column=col_idx, value=value)
+            
+            # Ajuster la largeur des colonnes
+            for column in sheet.columns:
+                max_length = 0
+                column_letter = column[0].column_letter
+                for cell in column:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(str(cell.value))
+                    except:
+                        pass
+                adjusted_width = min(max_length + 2, 30)
+                sheet.column_dimensions[column_letter].width = adjusted_width
+            
+            # Demander où sauvegarder le fichier
+            file_path = filedialog.asksaveasfilename(
+                title="Enregistrer le template Excel",
+                defaultextension=".xlsx",
+                filetypes=[("Fichiers Excel", "*.xlsx")]
+            )
+            
+            if file_path:
+                # Sauvegarder le fichier
+                workbook.save(file_path)
+                messagebox.showinfo("Template créé", f"Template Excel créé avec succès :\n{file_path}\n\nLe fichier contient :\n- Les colonnes attendues par l'application\n- Quelques exemples de données\n- Un formatage professionnel")
+                
+                # Proposer d'ouvrir le fichier
+                if messagebox.askyesno("Ouvrir le fichier", "Voulez-vous ouvrir le template Excel ?"):
+                    if platform.system() == "Windows":
+                        os.startfile(file_path)
+                    elif platform.system() == "Darwin":  # macOS
+                        subprocess.Popen(["open", file_path])
+                    else:  # Linux
+                        subprocess.Popen(["xdg-open", file_path])
+            
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Erreur lors de la création du template : {e}")
             
     def show_address_help(self):
         help_text = """Formats d'adresse pris en charge:
