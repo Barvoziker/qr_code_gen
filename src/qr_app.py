@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import qrcode
@@ -14,7 +16,7 @@ import openpyxl
 import openpyxl.styles
 
 # Importer les fonctions du générateur
-from qr_generator import create_vcard, parse_address, generate_qr_svg, process_excel_file
+from qr_generator import create_vcard, generate_qr_svg, process_excel_file
 
 class QRCodeGeneratorApp:
     def __init__(self, root):
@@ -124,7 +126,6 @@ class QRCodeGeneratorApp:
             ("Mobile", "mobile"),
             ("Téléphone Pro", "pro"),
             ("Email", "email"),
-            ("Adresse", "adresse", "Ex: 123 rue de Paris 75001 PARIS I FRANCE"),
             ("Site Web", "site_web")
         ]
         
@@ -143,16 +144,6 @@ class QRCodeGeneratorApp:
             
             self.manual_entries[field_name] = entry
             
-            # Ajouter un texte d'aide pour le champ adresse
-            if field_name == "adresse" and hint:
-                help_frame = ttk.Frame(form_frame)
-                help_frame.grid(row=i, column=2, sticky="w", padx=5, pady=5)
-                
-                help_text = ttk.Label(help_frame, text=hint[0], foreground="gray", font=("Helvetica", 8))
-                help_text.pack(side=tk.LEFT)
-                
-                help_btn = ttk.Button(help_frame, text="?", width=2, command=self.show_address_help)
-                help_btn.pack(side=tk.LEFT, padx=5)
         
         # Boutons
         button_frame = ttk.Frame(form_frame)
@@ -336,11 +327,10 @@ class QRCodeGeneratorApp:
             mobile = row_data.get('mobile', '')
             pro = row_data.get('pro', '')
             email = row_data.get('email', '')
-            adresse = row_data.get('adresse', '')
             site_web = row_data.get('site_web', '')
             
             # Créer la vCard
-            vcard_data = create_vcard(prenom, nom, profession, societe, mobile, pro, email, adresse, site_web)
+            vcard_data = create_vcard(prenom, nom, profession, societe, mobile, pro, email, '', site_web)
             
             # Générer le nom de fichier
             filename = f"{prenom}_{nom}_{index + 1}"
@@ -371,11 +361,10 @@ class QRCodeGeneratorApp:
             mobile = self.manual_entries["mobile"].get().strip()
             pro = self.manual_entries["pro"].get().strip()
             email = self.manual_entries["email"].get().strip()
-            adresse = self.manual_entries["adresse"].get().strip()
             site_web = self.manual_entries["site_web"].get().strip()
             
             # Créer la vCard
-            vcard_data = create_vcard(prenom, nom, profession, societe, mobile, pro, email, adresse, site_web)
+            vcard_data = create_vcard(prenom, nom, profession, societe, mobile, pro, email, '', site_web)
             
             # Générer le nom de fichier
             filename = f"{prenom}_{nom}_manual"
@@ -573,11 +562,10 @@ class QRCodeGeneratorApp:
                 mobile = self.manual_entries["mobile"].get().strip()
                 pro = self.manual_entries["pro"].get().strip()
                 email = self.manual_entries["email"].get().strip()
-                adresse = self.manual_entries["adresse"].get().strip()
                 site_web = self.manual_entries["site_web"].get().strip()
                 
                 # Créer la vCard
-                vcard_data = create_vcard(prenom, nom, profession, societe, mobile, pro, email, adresse, site_web)
+                vcard_data = create_vcard(prenom, nom, profession, societe, mobile, pro, email, '', site_web)
                 
                 # Générer le nom de fichier
                 filename = f"{prenom}_{nom}_realtime"
@@ -611,7 +599,7 @@ class QRCodeGeneratorApp:
             # Définir les en-têtes de colonnes
             headers = [
                 "Prenom", "Nom", "Profession", "Societe", "Mobile", 
-                "Pro", "Email", "Adresse", "Site_Web"
+                "Pro", "Email", "Site_Web"
             ]
             
             # Ajouter les en-têtes
@@ -623,9 +611,9 @@ class QRCodeGeneratorApp:
             
             # Ajouter quelques exemples de données
             examples = [
-                ["Jean", "DUPONT", "Développeur", "SUDALYS", "06.00.00.00.00", "01.00.00.00.00", "jean.dupont@sudalys.fr", "123 rue de Paris 75001 PARIS", "www.sudalys.fr"],
-                ["Marie", "MARTIN", "Chef de projet", "SUDALYS", "06.00.00.00.00", "01.00.00.00.00", "marie.martin@sudalys.fr", "456 avenue des Champs 75008 PARIS", ""],
-                ["Pierre", "BERNARD", "Commercial", "SUDALYS", "06.00.00.00.00", "", "pierre.bernard@sudalys.fr", "", ""]
+                ["Jean", "DUPONT", "Développeur", "SUDALYS", "06.00.00.00.00", "01.00.00.00.00", "jean.dupont@sudalys.fr", "www.sudalys.fr"],
+                ["Marie", "MARTIN", "Chef de projet", "SUDALYS", "06.00.00.00.00", "01.00.00.00.00", "marie.martin@sudalys.fr", ""],
+                ["Pierre", "BERNARD", "Commercial", "SUDALYS", "06.00.00.00.00", "", "pierre.bernard@sudalys.fr", ""]
             ]
             
             for row_idx, example in enumerate(examples, 2):
@@ -669,57 +657,6 @@ class QRCodeGeneratorApp:
         except Exception as e:
             messagebox.showerror("Erreur", f"Erreur lors de la création du template : {e}")
             
-    def show_address_help(self):
-        # Vérifier si la fenêtre d'aide existe déjà et est visible
-        if self.help_window and self.help_window.winfo_exists():
-            # Ramener la fenêtre au premier plan
-            self.help_window.lift()
-            self.help_window.focus_force()
-            return
-        
-        help_text = """Formats d'adresse pris en charge:
-
-1. Format standard: 123 rue de Paris 75001 PARIS
-2. Avec pays: 123 rue de Paris 75001 PARIS I FRANCE
-3. Format inversé: 123 rue de Paris PARIS 75001
-4. Format avec parenthèses: 123 rue de Paris PARIS (75001)
-5. Format international: 123 rue de Paris F-75001 PARIS
-
-Le système essaiera d'extraire automatiquement:
-- La rue
-- La ville
-- Le code postal
-- Le pays (si spécifié)
-
-Pour de meilleurs résultats, utilisez le format standard."""
-        
-        self.help_window = tk.Toplevel(self.root)
-        self.help_window.title("Aide - Format d'adresse")
-        self.help_window.geometry("500x350")
-        
-        # Ajouter l'icône à la fenêtre d'aide
-        try:
-            # Chemin relatif depuis le dossier src vers assets
-            icon_path = os.path.join("..", "assets", "logo_sudalys_services.ico")
-            if os.path.exists(icon_path):
-                self.help_window.iconbitmap(icon_path)
-        except Exception:
-            # Si l'icône n'est pas trouvée, continuer sans erreur
-            pass
-        
-        # Fonction pour nettoyer la référence quand la fenêtre se ferme
-        def on_help_window_close():
-            self.help_window = None
-        
-        self.help_window.protocol("WM_DELETE_WINDOW", lambda: [self.help_window.destroy(), on_help_window_close()])
-        
-        text_widget = tk.Text(self.help_window, wrap=tk.WORD, padx=10, pady=10)
-        text_widget.insert(tk.END, help_text)
-        text_widget.config(state=tk.DISABLED)
-        text_widget.pack(fill=tk.BOTH, expand=True)
-        
-        close_btn = ttk.Button(self.help_window, text="Fermer", command=lambda: [self.help_window.destroy(), on_help_window_close()])
-        close_btn.pack(pady=10)
 
 def main():
     root = tk.Tk()

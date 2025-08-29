@@ -1,4 +1,5 @@
-import qrcode
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 import qrcode.image.svg
 import os
 import sys
@@ -7,147 +8,48 @@ import platform
 from pathlib import Path
 import openpyxl
 
-def parse_address(adresse_complete):
-    """
-    Parse une adresse et la convertit au format ADR vCard
-    Format ADR: Boîte postale;Adresse étendue;Nom de rue;Ville;Région;Code postal;Pays
-    """
-    if not adresse_complete or str(adresse_complete).strip().lower() == 'nan':
-        return ";;;;;;"
-        
-    try:
-        adresse_complete = str(adresse_complete).strip()
-        
-        # Initialiser les variables
-        rue = ''
-        ville = ''
-        code_postal = ''
-        pays = ''
-        region = ''
-        
-        # Étape 1: Extraire le pays s'il est présent
-        import re
-        
-        # Rechercher le pays à la fin (après I, FR, FRANCE, etc.)
-        pays_patterns = [
-            r'\s+I\s+([A-Z][A-Za-z\s]+)$',  # Format " I FRANCE"
-            r'\s+FR\s+([A-Z][A-Za-z\s]+)$',  # Format " FR FRANCE"
-            r'\s+FRANCE$',                   # Juste "FRANCE" à la fin
-            r'\s+([A-Z]{2,3})$'              # Code pays à la fin (FR, USA, etc.)
-        ]
-        
-        for pattern in pays_patterns:
-            pays_match = re.search(pattern, adresse_complete)
-            if pays_match:
-                if len(pays_match.groups()) > 0:
-                    pays = pays_match.group(1).strip()
-                else:
-                    pays = 'FRANCE'  # Si on trouve juste le mot FRANCE
-                adresse_complete = adresse_complete[:pays_match.start()].strip()
-                break
-        
-        # Si aucun pays trouvé mais contient "FRANCE" quelque part
-        if not pays and 'FRANCE' in adresse_complete.upper():
-            pays = 'FRANCE'
-            adresse_complete = adresse_complete.upper().replace('FRANCE', '').strip()
-        
-        # Étape 2: Extraire le code postal et la ville
-        # Différents formats possibles: "75001 PARIS", "F-75001 PARIS", "PARIS (75001)", etc.
-        cp_ville_patterns = [
-            r'(\d{5})\s+([^\d]+)$',               # Format "75001 PARIS"
-            r'F-(\d{5})\s+([^\d]+)$',             # Format "F-75001 PARIS"
-            r'([^\d\(]+)\s*\((\d{5})\)$',         # Format "PARIS (75001)"
-            r'([^\d\(]+)\s+(\d{5})$',             # Format "PARIS 75001"
-        ]
-        
-        for pattern in cp_ville_patterns:
-            cp_ville_match = re.search(pattern, adresse_complete)
-            if cp_ville_match:
-                # Selon le format, l'ordre des groupes peut varier
-                if pattern == r'([^\d\(]+)\s*\((\d{5})\)$' or pattern == r'([^\d\(]+)\s+(\d{5})$':
-                    ville = cp_ville_match.group(1).strip()
-                    code_postal = cp_ville_match.group(2).strip()
-                else:
-                    code_postal = cp_ville_match.group(1).strip()
-                    ville = cp_ville_match.group(2).strip()
-                
-                # Le reste est l'adresse de rue
-                rue = adresse_complete[:cp_ville_match.start()].strip()
-                break
-        
-        # Si pas de match, essayer de trouver juste un code postal (5 chiffres)
-        if not code_postal:
-            cp_match = re.search(r'(\d{5})', adresse_complete)
-            if cp_match:
-                code_postal = cp_match.group(1)
-                # Essayer de trouver la ville après le code postal
-                reste = adresse_complete[cp_match.end():].strip()
-                if reste:
-                    # Prendre le premier mot après le code postal comme ville
-                    ville_match = re.match(r'([A-Za-z\s\-]+)', reste)
-                    if ville_match:
-                        ville = ville_match.group(1).strip()
-                        # Le reste avant le code postal est la rue
-                        rue = adresse_complete[:cp_match.start()].strip()
-                    else:
-                        # Pas de ville trouvée, tout ce qui reste est la rue
-                        rue = adresse_complete.strip()
-                else:
-                    # Pas de texte après le code postal, tout ce qui précède est la rue
-                    rue = adresse_complete[:cp_match.start()].strip()
-            else:
-                # Pas de code postal trouvé, tout est considéré comme rue
-                rue = adresse_complete.strip()
-        
-        # Format ADR: Boîte postale;Adresse étendue;Nom de rue;Ville;Région;Code postal;Pays
-        return f";;{rue};{ville};{region};{code_postal};{pays}"
-    
-    except Exception as e:
-        # En cas d'erreur, retourner l'adresse dans le champ rue
-        print(f"Erreur lors du parsing de l'adresse: {e}")
-        return f";;{adresse_complete};;;;"
 
 
 def create_vcard(prenom, nom, profession, societe, mobile, pro, email, adresse, site_web):
     """
-    Crée une vCard au format texte avec tous les champs
+    Crée une vCard ultra-optimisée pour réduire la complexité du QR code
     """
-    # Construire le nom complet
+    # Format ultra-compact - version 2.1 et syntaxe minimale
+    vcard_lines = ["BEGIN:VCARD", "VERSION:3.0"]
+    
+    # Nom (obligatoire) - format standard
     full_name = f"{prenom} {nom}".strip()
+    if full_name:
+        vcard_lines.append(f"FN:{full_name}")
+        vcard_lines.append(f"N:{nom};{prenom}")
     
-    # Commencer la vCard
-    vcard_lines = [
-        "BEGIN:VCARD",
-        "VERSION:3.0",
-        f"FN:{full_name}",
-        f"N:{nom};{prenom};;;"
-    ]
+    # Téléphones - format court sans TYPE
+    if mobile and str(mobile).strip() and str(mobile).strip().lower() != 'nan':
+        vcard_lines.append(f"TEL:{mobile}")
     
-    # Ajouter les champs optionnels s'ils existent
-    if profession and str(profession).strip() and str(profession).strip().lower() != 'nan':
-        vcard_lines.append(f"TITLE:{profession}")
+    if pro and str(pro).strip() and str(pro).strip().lower() != 'nan':
+        vcard_lines.append(f"TEL:{pro}")
     
-    if societe and str(societe).strip() and str(societe).strip().lower() != 'nan':
-        vcard_lines.append(f"ORG:{societe}")
-    
+    # Email - format court
     if email and str(email).strip() and str(email).strip().lower() != 'nan':
         vcard_lines.append(f"EMAIL:{email}")
     
-    if mobile and str(mobile).strip() and str(mobile).strip().lower() != 'nan':
-        vcard_lines.append(f"TEL;TYPE=CELL:{mobile}")
+    # Société - format court
+    if societe and str(societe).strip() and str(societe).strip().lower() != 'nan':
+        vcard_lines.append(f"ORG:{societe}")
     
-    if pro and str(pro).strip() and str(pro).strip().lower() != 'nan':
-        vcard_lines.append(f"TEL;TYPE=WORK:{pro}")
+    # Profession - format court
+    if profession and str(profession).strip() and str(profession).strip().lower() != 'nan':
+        vcard_lines.append(f"TITLE:{profession}")
     
-    if adresse and str(adresse).strip() and str(adresse).strip().lower() != 'nan':
-        parsed_address = parse_address(str(adresse).strip())
-        vcard_lines.append(f"ADR:{parsed_address}")
-    
+    # Site web - format court sans https://
     if site_web and str(site_web).strip() and str(site_web).strip().lower() != 'nan':
-        # Ajouter http:// si pas de protocole
         url = str(site_web).strip()
-        if not url.startswith(('http://', 'https://')):
-            url = f"https://{url}"
+        # Enlever le protocole pour économiser des caractères
+        if url.startswith('https://'):
+            url = url[8:]
+        elif url.startswith('http://'):
+            url = url[7:]
         vcard_lines.append(f"URL:{url}")
     
     vcard_lines.append("END:VCARD")
@@ -157,10 +59,25 @@ def create_vcard(prenom, nom, profession, societe, mobile, pro, email, adresse, 
 
 def generate_qr_svg(data, filename):
     """
-    Génère un QR code en format SVG
+    Génère un QR code en format SVG de 100x100 pixels
     """
+    # Encoder les données en UTF-8 pour éviter les problèmes d'encodage
+    if isinstance(data, str):
+        data = data.encode('utf-8').decode('utf-8')
+    
+    # Configuration pour QR code 100x100 pixels
+    qr = qrcode.QRCode(
+        version=1,  # Taille minimale (21x21 modules)
+        error_correction=qrcode.constants.ERROR_CORRECT_L,  # Correction d'erreur faible
+        box_size=4,  # 4px par module (21*4 = 84px + bordures = ~100px)
+        border=2,   # Bordure de 2 modules (8px)
+    )
+    
+    qr.add_data(data)
+    qr.make(fit=True)
+    
     factory = qrcode.image.svg.SvgPathImage
-    img = qrcode.make(data, image_factory=factory)
+    img = qr.make_image(image_factory=factory)
     
     # Déterminer le chemin approprié pour les QR codes
     # Si l'application est compilée en .exe, utiliser le dossier de l'utilisateur
@@ -182,10 +99,23 @@ def generate_qr_svg(data, filename):
     # Créer le dossier de sortie s'il n'existe pas
     output_dir.mkdir(exist_ok=True, parents=True)
     
-    # Sauvegarder le fichier SVG
+    # Sauvegarder le fichier SVG avec encodage UTF-8
     filepath = output_dir / f"{filename}.svg"
     with open(filepath, 'wb') as f:
         img.save(f)
+    
+    # Corriger l'encodage du fichier SVG généré
+    try:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            svg_content = f.read()
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(svg_content)
+    except UnicodeDecodeError:
+        # Si erreur d'encodage, essayer avec latin-1 puis sauver en UTF-8
+        with open(filepath, 'r', encoding='latin-1') as f:
+            svg_content = f.read()
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(svg_content)
     
     return filepath
 
