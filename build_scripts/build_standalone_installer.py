@@ -21,14 +21,14 @@ def create_standalone_installer():
         print("❌ ERREUR: Le script create_installer.py n'existe pas!")
         return False
     
-    print("✅ Fichiers source trouvés")
+    print("[OK] Fichiers source trouvés")
     
     # Créer le dossier de sortie
     output_dir = Path("installer_output")
     output_dir.mkdir(exist_ok=True)
     
     # Compiler l'installateur avec PyInstaller
-    print("🔨 Compilation de l'installateur...")
+    print("Compilation de l'installateur...")
     
     # Vérifier que tous les fichiers existent avant de construire la commande
     required_files = [
@@ -41,7 +41,7 @@ def create_standalone_installer():
     
     for file_path in required_files:
         if not Path(file_path).exists():
-            print(f"❌ Fichier manquant: {file_path}")
+            print(f"[ERREUR] Fichier manquant: {file_path}")
             return False
     
     # Vérifier que l'icône existe
@@ -83,28 +83,28 @@ def create_standalone_installer():
             installer_exe = output_dir / "Sudalys_QR_Generator_Setup.exe"
             if installer_exe.exists():
                 size_mb = installer_exe.stat().st_size / (1024 * 1024)
-                print(f"✅ Installateur créé avec succès!")
-                print(f"📦 Fichier: {installer_exe}")
-                print(f"📏 Taille: {size_mb:.1f} MB")
-                print(f"\n🎉 L'installateur autonome est prêt!")
-                print(f"👥 Distribuez simplement: {installer_exe.name}")
+                print(f"[SUCCES] Installateur créé avec succès!")
+                print(f"Fichier: {installer_exe}")
+                print(f"Taille: {size_mb:.1f} MB")
+                print(f"\nL'installateur autonome est prêt!")
+                print(f"Distribuez simplement: {installer_exe.name}")
                 return True
             else:
-                print("⚠️ Compilation réussie mais fichier non trouvé")
+                print("[ATTENTION] Compilation réussie mais fichier non trouvé")
                 return False
         else:
-            print(f"❌ Erreur de compilation:")
+            print(f"[ERREUR] Erreur de compilation:")
             if result.stderr:
                 print(result.stderr)
             return False
             
     except Exception as e:
-        print(f"❌ Erreur: {e}")
+        print(f"[ERREUR] Erreur: {e}")
         return False
 
 def copy_files_for_installer():
     """Copie les fichiers nécessaires dans le bon dossier pour l'installateur"""
-    print("📋 Préparation des fichiers pour l'installateur...")
+    print("Préparation des fichiers pour l'installateur...")
     
     # Créer un dossier temporaire pour l'installateur
     installer_files_dir = Path("installer_files")
@@ -126,15 +126,15 @@ def copy_files_for_installer():
         src_path = Path(src)
         if src_path.exists():
             shutil.copy2(src_path, installer_files_dir / dst)
-            print(f"  ✅ {src}")
+            print(f"  [OK] {src}")
         else:
-            print(f"  ⚠️ Fichier manquant: {src}")
+            print(f"  [ATTENTION] Fichier manquant: {src}")
     
     return installer_files_dir
 
 def main():
     """Fonction principale"""
-    print("🚀 Construction de l'installateur autonome Sudalys QR Generator\n")
+    print("=== Construction de l'installateur autonome Sudalys QR Generator ===\n")
     
     # Étape 1: Préparer les fichiers
     installer_files_dir = copy_files_for_installer()
@@ -147,11 +147,11 @@ def main():
         shutil.rmtree(installer_files_dir)
     
     if success:
-        print("\n🎯 SUCCÈS TOTAL!")
-        print("📦 Votre installateur autonome est prêt dans installer_output/")
-        print("👥 Les utilisateurs n'ont qu'à lancer le fichier .exe pour installer!")
+        print("\n=== SUCCÈS TOTAL! ===")
+        print("Votre installateur autonome est prêt dans installer_output/")
+        print("Les utilisateurs n'ont qu'à lancer le fichier .exe pour installer!")
     else:
-        print("\n💥 Échec de la création de l'installateur")
+        print("\n[ERREUR] Échec de la création de l'installateur")
         sys.exit(1)
 
 if __name__ == "__main__":
