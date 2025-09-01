@@ -98,7 +98,12 @@ def build_executable():
     
     if result == 0:
         print("\nCompilation réussie!")
-        exe_path = os.path.join("dist", f"{app_name}.exe")
+        # Adapter l'extension selon l'OS
+        if sys.platform.startswith('win'):
+            exe_path = os.path.join("dist", f"{app_name}.exe")
+        else:
+            exe_path = os.path.join("dist", app_name)
+        
         if os.path.exists(exe_path):
             print(f"Exécutable créé: {exe_path}")
             return True
